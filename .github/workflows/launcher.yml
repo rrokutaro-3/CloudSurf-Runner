@@ -10,38 +10,34 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Start CloudSurf Codespace
-        run: |
-          CODESPACE="${{ vars.CLOUDSURF_CODESPACE_NAME }}"
-          
-          if [ -z "$CODESPACE" ]; then
-            echo "❌ No codespace name set!"
-            exit 1
-          fi
-
-          echo "🔍 Checking codespace: $CODESPACE"
-          
-          STATE=$(gh codespace list --json name,state -q '.[] | select(.name == "'$CODESPACE'") | .state' || echo "Not found")
-          echo "Current state: $STATE"
-
-          if [ "$STATE" = "Available" ]; then
-            echo "✅ Already running."
-          else
-            echo "🚀 Sending start command..."
-            gh codespace code --codespace "$CODESPACE" --web > /dev/null 2>&1 || true
+        - name: Start CloudSurf Codespace
+          run: |
+            CODESPACE="shiny-space-broccoli-xq9wjp4wp67h46q"
             
-            echo "⏳ Waiting up to 60 seconds for it to start..."
-            for i in {1..12}; do
-              sleep 5
-              NEW_STATE=$(gh codespace list --json name,state -q '.[] | select(.name == "'$CODESPACE'") | .state' || echo "Not found")
-              echo "Status check $i/12: $NEW_STATE"
-              if [ "$NEW_STATE" = "Available" ]; then
-                echo "🎉 Codespace is now running!"
-                exit 0
-              fi
-            done
+            echo "🔍 Current status of $CODESPACE"
+            STATE=$(gh codespace list --json name,state -q '.[] | select(.name == "'$CODESPACE'") | .state' || echo "unknown")
+            echo "State: $STATE"
             
-            echo "⚠️ Codespace is still not Available after waiting. It might still be starting."
-          fi
-        env:
-          GH_TOKEN: ${{ secrets.CLOUDSURF_PAT }}
+            if [ "$STATE" = "Available" ]; then
+              echo "✅ Already running"
+            else
+              echo "🚀 Attempting to wake up codespace..."
+              
+              # This often forces it to start
+              gh codespace view --codespace "$CODESPACE" > /dev/null 2>&1 || true
+              
+              echo "⏳ Waiting and checking..."
+              for i in {1..18}; do
+                sleep 10
+                NEW_STATE=$(gh codespace list --json name,state -q '.[] | select(.name == "'$CODESPACE'") | .state' || echo "unknown")
+                echo "Check $i: $NEW_STATE"
+                if [ "$NEW_STATE" = "Available" ]; then
+                  echo "🎉 Successfully started!"
+                  exit 0
+                fi
+              done
+              
+              echo "⚠️ Still not available after 3 minutes. It may need more time or manual start."
+            fi
+          env:
+            GH_TOKEN: ${{ secrets.CLOUDSURF_PAT }}
