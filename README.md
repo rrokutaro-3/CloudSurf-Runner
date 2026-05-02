@@ -1,4 +1,4 @@
-# ☁️ CloudSurf
+# ☁️ CloudSurf Runner
 
 Free cloud browser farm — run persistent Chrome profiles in GitHub Codespaces, fully automated via GitHub Actions.
 
