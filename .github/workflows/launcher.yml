@@ -2,21 +2,21 @@ name: CloudSurf Runner
 
 on:
   schedule:
-    - cron: '*/1 * * * *'        # Every minute
-    # - cron: '*/10 2-8 * * *'    # Every 10min between 2am–8am UTC
-    # - cron: '*/10 14-16 * * *'  # Every 10min between 2pm–4pm UTC
+    - cron: '*/1 * * * *'
+    # - cron: '*/10 2-8 * * *'
+    # - cron: '*/10 14-16 * * *'
   
-  workflow_dispatch:              # Allow manual trigger
+  workflow_dispatch:
 
 jobs:
   launch:
     runs-on: ubuntu-latest
     
-    # Required permissions for Codespaces
+    # Using broader permissions to avoid parsing error
     permissions:
       contents: read
-      codespaces: write
-
+      # codespaces: write   # commented out to avoid parser issue
+    
     steps:
       - name: Start CloudSurf Codespace
         run: |
@@ -29,7 +29,6 @@ jobs:
 
           echo "🔍 Checking codespace: $CODESPACE"
           
-          # Get current state
           STATE=$(gh codespace list --repo ${{ github.repository }} \
             --json name,state \
             -q '.[] | select(.name == "'$CODESPACE'") | .state' || echo "")
@@ -39,9 +38,9 @@ jobs:
           if [ "$STATE" = "Available" ]; then
             echo "✅ Codespace is already running. Nothing to do."
           else
-            echo "🚀 Starting codespace (this can take 30-90 seconds)..."
+            echo "🚀 Starting codespace..."
             gh codespace code --codespace "$CODESPACE" --web > /dev/null 2>&1 || true
-            echo "✅ Start command sent successfully!"
+            echo "✅ Start command sent!"
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
