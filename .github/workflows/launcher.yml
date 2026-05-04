@@ -3,6 +3,7 @@ name: CloudSurf Runner
 on:
   schedule:
     - cron: '*/15 * * * *' 
+    # - cron: '*/15 2-7 * * *'
   workflow_dispatch:
 
 jobs:
