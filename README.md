@@ -1,86 +1,85 @@
-# ☁️ CloudSurf
+# ☁️ CloudSurf Runner
 
-Free cloud browser farm — run persistent Chrome profiles in GitHub Codespaces, fully automated via GitHub Actions.
+GitHub Actions workflow that keeps a CloudSurf Codespace alive — waking it automatically every 5 minutes via multiple fallback strategies.
 
 ---
 
 ## How it works
 
-- Each browser profile runs in its own Xvfb display with VNC + NoVNC
-- A Flask UI at port 7860 manages all profiles
-- GitHub Actions keeps the Codespace alive and running on a schedule
-- On every Codespace start, CloudSurf launches automatically
+The workflow runs on a schedule and tries three escalating tricks to wake the Codespace:
+
+1. **`gh codespace start`** — official CLI wake command
+2. **SSH ping** — forces the VM runtime to spin up even if the API alone doesn't stick
+3. **REST API POST `/start`** — hits the GitHub API directly, bypassing the CLI layer
+
+If none of the tricks immediately return `Available`, it polls every 10 seconds for up to 5 minutes.
 
 ---
 
-## First-time setup
+## Setup
 
-### 1. Create your Codespace
-Go to your repo → **Code → Codespaces → New codespace**
+### 1. Fork or clone this repo
 
-Wait for it to build and CloudSurf to launch automatically at port 7860.
+### 2. Generate a GitHub Personal Access Token
 
-### 2. Create your browser profiles
-Open the CloudSurf UI and create your profiles (up to 9 for GPU Colab sessions).
+Go to **GitHub → Avatar → Settings → Developer settings → Personal access tokens → Tokens (classic) → Generate new token**
 
-Note down the profile IDs — you'll need them for auto-launch.
+Check these scopes:
+- `repo` — full control of private repositories
+- `user` — needed for the REST API call
+- `codespace` — full control of codespaces
 
-### 3. Set the Codespace name for GitHub Actions
-Go to your repo → **Settings → Secrets and variables → Actions → Variables**
+Copy the token — GitHub only shows it once.
 
-| Variable | Value |
-|----------|-------|
-| `CLOUDSURF_CODESPACE_NAME` | your codespace name (run `gh codespace list` to get it) |
+### 3. Add secrets
 
-### 4. Push the workflow
-Place `.github/workflows/launcher.yml` in your repo and push to main — it will run automatically on schedule.
+Go to your repo → **Settings → Secrets and variables → Actions → New repository secret**
+
+| Secret | Value |
+|--------|-------|
+| `CLOUDSURF_PAT` | Personal access token from step 2 |
+| `CLOUDSURF_CODESPACE_NAME` | Your codespace name (run `gh codespace list` to find it) |
+
+> Both values are stored as encrypted secrets and never exposed in logs.
+
+### 4. Push to main
+
+The workflow lives at `.github/workflows/runner.yml` and runs automatically on schedule once pushed.
 
 ---
 
 ## Schedule
 
-The action runs every 10 minutes during two daily windows (UTC):
+Runs every 5 minutes, continuously.
 
-| Window | Time (UTC) | Best for |
-|--------|-----------|---------|
-| Night | 2am – 8am | Lowest Colab traffic, best GPU availability |
-| Midday | 2pm – 4pm | Secondary window |
+To change the frequency, edit the `cron` line in `.github/workflows/runner.yml`:
 
-To change the schedule, edit the `cron` lines in `.github/workflows/launcher.yml`.
+```yaml
+- cron: '*/5 * * * *'
+```
 
 ---
 
 ## Manual trigger
 
-Go to **Actions → CloudSurf Runner → Run workflow** to start it anytime.
+Go to **Actions → CloudSurf Runner → Run workflow** to fire it anytime.
 
 ---
 
-## Scripts
+## Workflow output
 
-Drop `.js` files into the `scripts/` folder to automate actions in Chrome via Puppeteer (CDP).
+Each run logs the codespace state at every step:
+📋 Current state: Shutdown
+🚀 Trick 1: gh codespace start
+State after start: Shutdown
+🔌 Trick 2: SSH ping
+State after SSH ping: Available
+🎉 Done (trick 2)!
 
-Each script receives:
-- `CLOUDSURF_CDP_URL` — WebSocket URL for Puppeteer
-- `CLOUDSURF_CDP_PORT` — raw CDP port
-- `CLOUDSURF_PROFILE_ID` — profile ID string
-- `DISPLAY` — Xvfb display for this profile
-
----
-
-## Stopping
-
-```bash
-bash stop.sh
-```
+If all tricks fail, it polls for X minutes before exiting with a non-zero code (visible as a failed run in Actions).
 
 ---
 
-## Logs
+## Related
 
-| Log | Description |
-|-----|-------------|
-| `logs/setup.log` | First-time setup output |
-| `logs/manager.log` | Flask manager + profile activity |
-| `logs/keepalive.log` | Keep-alive pings |
-
+- [CloudSurf](https://github.com/rrokutaro/CloudSurf) — the main Codespace repo with the browser farm UI
