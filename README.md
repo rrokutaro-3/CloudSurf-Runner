@@ -83,3 +83,4 @@ bash stop.sh
 | `logs/setup.log` | First-time setup output |
 | `logs/manager.log` | Flask manager + profile activity |
 | `logs/keepalive.log` | Keep-alive pings |
+
