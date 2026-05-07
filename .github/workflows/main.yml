@@ -1,43 +1,71 @@
 name: CloudSurf Runner
-
 on:
   schedule:
-    - cron: '*/5 * * * *' 
+    - cron: '*/5 * * * *'
   workflow_dispatch:
-
 jobs:
   launch:
     runs-on: ubuntu-latest
-
     steps:
-        - name: Start CloudSurf Codespace
-          run: |
-            CODESPACE="shiny-space-broccoli-xq9wjp4wp67h46q"
-            
-            echo "🔍 Current status of $CODESPACE"
-            STATE=$(gh codespace list --json name,state -q '.[] | select(.name == "'$CODESPACE'") | .state' || echo "unknown")
-            echo "State: $STATE"
-            
+      - name: Wake CloudSurf Codespace (all tricks)
+        run: |
+          CODESPACE="${{ secrets.CLOUDSURF_CODESPACE_NAME }}"
+
+          check_state() {
+            gh codespace list --json name,state \
+              -q '.[] | select(.name == "'"$CODESPACE"'") | .state' 2>/dev/null || echo "unknown"
+          }
+
+          STATE=$(check_state)
+          echo "📋 Current state: $STATE"
+
+          if [ "$STATE" = "Available" ]; then
+            echo "✅ Already running — nothing to do."
+            exit 0
+          fi
+
+          # ── Trick 1: official start command ──────────────────────────────
+          echo "🚀 Trick 1: gh codespace start"
+          gh codespace start --codespace "$CODESPACE" 2>&1 || true
+
+          STATE=$(check_state)
+          echo "   State after start: $STATE"
+          [ "$STATE" = "Available" ] && echo "🎉 Done (trick 1)!" && exit 0
+
+          # ── Trick 2: SSH ping — forces the runtime to wake ───────────────
+          echo "🔌 Trick 2: SSH ping"
+          gh codespace ssh --codespace "$CODESPACE" -- echo "ping" 2>&1 || true
+
+          STATE=$(check_state)
+          echo "   State after SSH ping: $STATE"
+          [ "$STATE" = "Available" ] && echo "🎉 Done (trick 2)!" && exit 0
+
+          # ── Trick 3: REST API start nudge ─────────────────────────────────
+          echo "🌐 Trick 3: REST API POST /start"
+          curl -s -o /dev/null -w "HTTP %{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/user/codespaces/$CODESPACE/start" 2>&1 || true
+          echo ""
+
+          STATE=$(check_state)
+          echo "   State after REST nudge: $STATE"
+          [ "$STATE" = "Available" ] && echo "🎉 Done (trick 3)!" && exit 0
+
+          # ── Poll up to 5 minutes ──────────────────────────────────────────
+          echo "⏳ Polling for up to 5 minutes..."
+          for i in $(seq 1 30); do
+            sleep 10
+            STATE=$(check_state)
+            echo "   Check $i/30: $STATE"
             if [ "$STATE" = "Available" ]; then
-              echo "✅ Already running"
-            else
-              echo "🚀 Attempting to wake up codespace..."
-              
-              # This often forces it to start
-              gh codespace view --codespace "$CODESPACE" > /dev/null 2>&1 || true
-              
-              echo "⏳ Waiting and checking..."
-              for i in {1..18}; do
-                sleep 10
-                NEW_STATE=$(gh codespace list --json name,state -q '.[] | select(.name == "'$CODESPACE'") | .state' || echo "unknown")
-                echo "Check $i: $NEW_STATE"
-                if [ "$NEW_STATE" = "Available" ]; then
-                  echo "🎉 Successfully started!"
-                  exit 0
-                fi
-              done
-              
-              echo "⚠️ Still not available after 3 minutes. It may need more time or manual start."
+              echo "🎉 Codespace is live!"
+              exit 0
             fi
-          env:
-            GH_TOKEN: ${{ secrets.CLOUDSURF_PAT }}
+          done
+
+          echo "❌ Not available after 5 minutes."
+          exit 1
+        env:
+          GH_TOKEN: ${{ secrets.CLOUDSURF_PAT }}
