@@ -18,9 +18,9 @@ jobs:
             echo "✅ Already running — nothing to do."
             exit 0
           fi
-          # ── Trick 1: official start command ──────────────────────────────
-          echo "🚀 Trick 1: gh codespace start"
-          gh codespace code -c "$CODESPACE" 2>&1 || true
+          # ── Trick 1: CLI with --web (recommended for GitHub Actions) ───────
+          echo "🚀 Trick 1: gh codespace code --web"
+          gh codespace code -c "$CODESPACE" --web 2>&1 || true
           STATE=$(check_state)
           echo "   State after start: $STATE"
           [ "$STATE" = "Available" ] && echo "🎉 Done (trick 1)!" && exit 0
