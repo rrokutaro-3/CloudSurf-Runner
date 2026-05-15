@@ -4,6 +4,7 @@ on:
 jobs:
   launch:
     runs-on: ubuntu-latest
+    timeout-minutes: 1
     steps:
       - name: Wake CloudSurf Codespace (all tricks)
         run: |
